@@ -1378,7 +1378,7 @@ export class LocalModel {
 }
 
 /**
- * Microphone is an audio input source known to PulseAudio/PipeWire.
+ * Microphone is an audio input device.
  */
 export class Microphone {
     /**
@@ -1388,6 +1388,7 @@ export class Microphone {
     constructor($$source = {}) {
         if (!("name" in $$source)) {
             /**
+             * id passed back to startCapture
              * @member
              * @type {string}
              */

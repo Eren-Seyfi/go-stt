@@ -49,12 +49,12 @@ Mikrofondan gelen sesi **tamamen yerelde** (internet gerekmeden) yazıya döken,
 | --- | --- | --- | --- |
 | Kodun derlenmesi | ✅ | ✅ (cgo + MinGW ile) | ⚠️ denenmedi |
 | Hazır derlenmiş kütüphaneler (`third_party/whisper`, `llama`) | ✅ x86-64 + CUDA 13 | ❌ yeniden derlenmeli | ❌ yeniden derlenmeli |
-| Mikrofon kaydı | ✅ (`pactl` / `parecord`) | ❌ henüz yok | ❌ henüz yok |
+| Mikrofon kaydı | ✅ (`pactl` / `parecord`) | ✅ (Windows waveIn API) | ❌ henüz yok |
 | Klasör / dosya açma | ✅ (`xdg-open`) | ❌ henüz yok | ❌ henüz yok |
 | Yerel `llama-server` | ✅ | ✅ (`llama-server.exe`) | ⚠️ denenmedi |
 | Uygulama çökünce `llama-server`'ın da kapanması | ✅ | ❌ elle kapatılmalı | ❌ elle kapatılmalı |
 
-> **Özetle:** Uygulama şu an **Linux için geliştirilmiştir**. Windows'ta kod derlenir ve yapay zekâ sohbeti çalışır, ancak ses kaydı Linux'a özgü `pactl`/`parecord` araçlarıyla yapıldığı için **mikrofon özelliği Windows'ta çalışmaz**. Bunun için Windows'a özel bir ses kayıt katmanı yazılması gerekir.
+> **Özetle:** Uygulama **Linux için geliştirilmiştir** ve Linux'ta tüm özellikleriyle çalışır. **Windows'ta** konuşma tanıma (mikrofon kaydı dahil) ve yapay zekâ sohbeti çalışır; konuşma tanıma Windows'ta şimdilik yalnızca CPU ile yapılır. Birkaç yardımcı özellik ("klasörü aç" düğmeleri gibi) henüz yalnızca Linux'tadır. macOS için ses kayıt katmanı yoktur.
 
 ---
 
@@ -69,7 +69,9 @@ stt-app/
 │   ├── llama_proc_linux.go     ┐
 │   ├── llama_proc_windows.go   ├ işletim sistemine özel süreç yönetimi
 │   ├── llama_proc_other.go     ┘
-│   ├── audio.go            Mikrofon kaydı (pactl/parecord)
+│   ├── audio.go            Ortak ses kodu (seviye ölçer, kayıt arayüzü)
+│   ├── audio_pulse.go      Linux mikrofon kaydı (pactl/parecord)
+│   ├── audio_windows.go    Windows mikrofon kaydı (winmm waveIn)
 │   ├── ai.go               Yapay zekâ sağlayıcıları
 │   ├── models.go           Whisper model indirme
 │   ├── llm_models.go       GGUF model indirme / içe aktarma
@@ -239,7 +241,23 @@ Derlemeden sonra uygulamayı yeniden derleyin (`wails3 build`). Derleme çıktı
 
 ## Windows kurulumu (deneysel)
 
-> ⚠️ **Mikrofon kaydı Windows'ta çalışmaz.** Uygulama sesi Linux'a özgü `pactl`/`parecord` araçlarıyla kaydeder. Windows'ta arayüz açılır, yapay zekâ sohbeti ve dosya ekleme çalışır; konuşma tanıma için Windows'a özel bir ses kayıt katmanı eklenmesi gerekir. Aşağıdaki adımlar kodu Windows'ta **derleyip çalıştırmak** içindir.
+> **Hazır sürüm:** Kurulum gerektirmeyen Windows sürümü depoda hazırdır: `bin/windows/stt-app-windows-x64.zip`. Zip'i açıp `stt-app.exe`'yi çalıştırmanız yeterlidir; aşağıdaki adımlar yalnızca **Windows'ta kendiniz derlemek** isterseniz gereklidir.
+>
+> Mikrofon kaydı Windows'un yerleşik `winmm` waveIn API'siyle yapılır; ek program veya sürücü gerekmez. Windows, mikrofonun kendi formatını (ör. 48 kHz stereo) whisper'ın istediği 16 kHz mono formatına kendisi dönüştürür. Mikrofon listesinde Windows'un varsayılan kayıt cihazı en üstte gelir. Cihaz adları Windows tarafından 31 karaktere kısaltılır; seçilen mikrofon sonradan çıkarılırsa kayıt varsayılan cihazdan yapılır.
+>
+> Windows'ta uygulamanın mikrofona erişebilmesi için **Ayarlar → Gizlilik ve güvenlik → Mikrofon** altında "Masaüstü uygulamalarının mikrofonunuza erişmesine izin verin" seçeneği açık olmalıdır.
+
+### Linux'tan Windows sürümü üretme
+
+Taşınabilir Windows klasörü Linux'ta MinGW-w64 ile çapraz derlenerek üretilir:
+
+```bash
+# Arch/CachyOS: sudo pacman -S mingw-w64-gcc ninja
+build/windows/portable.sh              # whisper.cpp + llama.cpp + uygulama
+build/windows/portable.sh --skip-libs  # yalnızca uygulamayı yeniden derle
+```
+
+Çıktı `bin/windows/stt-app-windows-x64/` klasörü ve aynı adlı `.zip` dosyasıdır. Betik whisper.cpp'yi DLL olarak (`third_party/whisper-windows`), `llama-server.exe`'yi statik olarak (`third_party/llama-windows`) derler, MinGW çalışma zamanı DLL'lerini ekler ve tüm DLL bağımlılıklarının klasörde olduğunu doğrular. Dağıtım için `-march=native` yerine AVX2 hedeflenir (2013 sonrası Intel/AMD işlemciler).
 
 ### 1. Gerekli araçlar
 
@@ -332,7 +350,7 @@ Copy-Item C:\msys64\ucrt64\bin\libgcc_s_seh-1.dll, C:\msys64\ucrt64\bin\libstdc+
 
 ### Windows'ta bilinen kısıtlamalar
 
-- **Mikrofon kaydı yok** (`pactl`/`parecord` Windows'ta bulunmuyor).
+- **Konuşma tanıma yalnızca CPU ile** çalışır (CUDA sürümü Linux'tan çapraz derlenemez; Windows'ta MSVC + CUDA ile derlenmelidir).
 - **"Klasörü aç" düğmeleri çalışmaz** (`xdg-open` kullanılıyor; Windows karşılığı `explorer`).
 - **LM Studio'dan model içe aktarma** `cp --reflink` kullandığı için çalışmayabilir.
 - **Uygulama çökerse `llama-server.exe` açık kalır.** Görev Yöneticisi'nden kapatın. (Linux'taki `Pdeathsig` karşılığı Windows'ta "Job Object" ile eklenebilir.)
@@ -342,7 +360,7 @@ Copy-Item C:\msys64\ucrt64\bin\libgcc_s_seh-1.dll, C:\msys64\ucrt64\bin\libstdc+
 
 ## macOS
 
-macOS'ta kod derlenecek şekilde ayrılmıştır (`llama_proc_other.go`), ancak **denenmemiştir** ve Linux/Windows ile aynı ses kaydı kısıtlaması geçerlidir. Denemek isterseniz:
+macOS'ta kod derlenecek şekilde ayrılmıştır (`llama_proc_other.go`), ancak **denenmemiştir**. Ses kaydı macOS'ta `audio_pulse.go` (PulseAudio araçları) üzerinden denenir; bu araçlar macOS'ta genelde bulunmadığından mikrofon için macOS'a özel bir kayıt katmanı (CoreAudio) gerekir. Denemek isterseniz:
 
 - Xcode Command Line Tools: `xcode-select --install`
 - Homebrew ile: `brew install go node cmake ffmpeg`
@@ -506,7 +524,9 @@ git commit -m "whisper.cpp güncellendi"
 
 ### Yapılacaklar (Windows/macOS desteği için)
 
-- [ ] Windows/macOS için mikrofon kayıt katmanı (`audio.go` şu an `pactl`/`parecord`'a bağımlı).
+- [x] Windows mikrofon kayıt katmanı (`audio_windows.go`, winmm waveIn).
+- [ ] macOS mikrofon kayıt katmanı (CoreAudio).
+- [ ] Windows'ta CUDA destekli whisper.cpp derlemesi.
 - [ ] `xdg-open` yerine platforma göre `explorer` / `open`.
 - [ ] Windows'ta Job Object ile `llama-server`'ın uygulamayla birlikte kapanması.
 - [ ] `cp --reflink` yerine taşınabilir dosya kopyalama.

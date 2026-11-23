@@ -2,72 +2,34 @@ package backend
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"io"
 	"math"
-	"os/exec"
-	"sort"
-	"strings"
 	"time"
 )
 
+// Audio capture is per-OS:
+//
+//	audio_pulse.go    Linux & other Unix: PulseAudio/PipeWire (pactl, parecord)
+//	audio_windows.go  Windows: winmm waveIn API
+//
+// Each provides listMicrophones() and startCapture(), which delivers 16 kHz
+// mono s16le audio.
+
 const sampleRate = 16000
 
-// Microphone is an audio input source known to PulseAudio/PipeWire.
+// Microphone is an audio input device.
 type Microphone struct {
-	Name        string `json:"name"`
+	Name        string `json:"name"` // id passed back to startCapture
 	Description string `json:"description"`
 	Default     bool   `json:"default"`
 }
 
-// listMicrophones returns input sources, excluding speaker monitors.
-func listMicrophones() ([]Microphone, error) {
-	out, err := hostCommand("pactl", "-f", "json", "list", "sources").Output()
-	if err != nil {
-		return nil, err
-	}
-	var sources []struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-	}
-	if err := json.Unmarshal(out, &sources); err != nil {
-		return nil, err
-	}
-	def, _ := hostCommand("pactl", "get-default-source").Output()
-	defName := strings.TrimSpace(string(def))
-
-	mics := []Microphone{}
-	for _, s := range sources {
-		if strings.HasSuffix(s.Name, ".monitor") {
-			continue
-		}
-		desc := s.Description
-		if desc == "" {
-			desc = s.Name
-		}
-		mics = append(mics, Microphone{Name: s.Name, Description: desc, Default: s.Name == defName})
-	}
-	sort.SliceStable(mics, func(i, j int) bool { return mics[i].Default && !mics[j].Default })
-	return mics, nil
-}
-
-// startCapture records 16 kHz mono s16le audio from the given source
-// (empty = system default).
-func startCapture(device string, stderr io.Writer) (*exec.Cmd, io.ReadCloser, error) {
-	args := []string{"--raw", "--format=s16le", "--rate=16000", "--channels=1", "--latency-msec=50"}
-	if device != "" {
-		args = append(args, "--device="+device)
-	}
-	cmd := hostCommand("parecord", args...)
-	cmd.Stderr = stderr
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, nil, err
-	}
-	return cmd, out, nil
+// audioCapture is a running recording.
+type audioCapture interface {
+	// Stop ends the recording; the audio reader then reaches EOF.
+	Stop()
+	// Wait blocks until the recording has fully ended.
+	Wait() error
 }
 
 // levelReader passes audio through unchanged while reporting the input

@@ -11,8 +11,11 @@ Kurulum gerekmez: klasörü istediğiniz yere kopyalayıp stt-app.exe'yi çalı�
 - Konuşma tanıma bu sürümde CPU ile çalışır (AVX2 destekli işlemci gerekir).
 - llama-server.exe yerel GGUF modellerini çalıştırmak içindir.
 
+MİKROFON
+- Mikrofon listesinde Windows'un varsayılan kayıt cihazı en üstte gelir.
+- Mikrofon çalışmıyorsa: Ayarlar > Gizlilik ve güvenlik > Mikrofon altında
+  "Masaüstü uygulamalarının mikrofonunuza erişmesine izin verin" açık olmalı.
+
 BİLİNEN KISITLAMALAR
-- Mikrofon kaydı Windows'ta henüz desteklenmiyor (Linux'a özgü pactl/parecord
-  kullanılıyor). Yapay zekâ sohbeti ve dosya ekleme çalışır.
 - "Klasörü aç" düğmeleri çalışmaz.
 - Uygulama çökerse llama-server.exe açık kalabilir; Görev Yöneticisi'nden kapatın.

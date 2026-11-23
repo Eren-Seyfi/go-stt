@@ -74,7 +74,7 @@ type SystemInfo struct {
 // is an error message or "").
 type STTService struct {
 	mu      sync.Mutex
-	cmd     *exec.Cmd
+	cmd     audioCapture // the running microphone recording
 	done    chan struct{}
 	modelID string
 	sys     *SystemInfo
@@ -198,7 +198,7 @@ func (s *STTService) Start(opts StartOptions) error {
 	var stderr strings.Builder
 	cmd, stdout, err := startCapture(opts.Microphone, &stderr)
 	if err != nil {
-		return errors.New("mikrofon açılamadı (parecord): " + err.Error())
+		return errors.New("mikrofon açılamadı: " + err.Error())
 	}
 
 	wakeWord := opts.WakeWord
@@ -226,7 +226,7 @@ func (s *STTService) Start(opts StartOptions) error {
 	s.cmd, s.modelID, s.filter = cmd, c.ID, cf
 	app.Event.Emit("stt:started", c.ID)
 	s.done = make(chan struct{})
-	go func(cmd *exec.Cmd, done chan struct{}) {
+	go func(cmd audioCapture, done chan struct{}) {
 		if cf != nil {
 			defer cf.close()
 		}
@@ -263,7 +263,7 @@ func (s *STTService) Stop() {
 	if cmd == nil {
 		return
 	}
-	_ = cmd.Process.Kill()
+	cmd.Stop()
 	<-done
 	_ = cmd.Wait()
 	application.Get().Event.Emit("stt:stopped", "")
