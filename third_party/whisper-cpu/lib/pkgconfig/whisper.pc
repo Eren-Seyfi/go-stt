@@ -1,0 +1,10 @@
+prefix=/home/eren/Masaüstü/stt-app/third_party/whisper
+exec_prefix=${prefix}
+libdir=/home/eren/Masaüstü/stt-app/third_party/whisper/lib
+includedir=/home/eren/Masaüstü/stt-app/third_party/whisper/include
+
+Name: whisper
+Description: Port of OpenAI's Whisper model in C/C++
+Version: 1.9.6-dev
+Libs: -L${libdir} -lggml  -lggml-base -lwhisper
+Cflags: -I${includedir}

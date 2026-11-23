@@ -1,0 +1,10 @@
+prefix=/home/eren/Masaüstü/stt-app/third_party/whisper-cuda
+exec_prefix=${prefix}
+libdir=/home/eren/Masaüstü/stt-app/third_party/whisper-cuda/lib
+includedir=/home/eren/Masaüstü/stt-app/third_party/whisper-cuda/include
+
+Name: parakeet
+Description: Port of NVIDIA's Parakeet model in C/C++
+Version: 1.9.6-dev
+Libs: -L${libdir} -lggml -lggml-base -lparakeet
+Cflags: -I${includedir}

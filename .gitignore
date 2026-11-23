@@ -10,10 +10,10 @@ build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
 # Vosk library and speech model (downloaded, large)
-third_party/
+#third_party/
 # App data — everything the app stores lives in the project folder
-/database.sqlite
-/database.sqlite-*
+#/database.sqlite
+#/database.sqlite-*
 /models/
 /attachments/
 /.webkit/

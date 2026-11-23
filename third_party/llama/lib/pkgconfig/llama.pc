@@ -1,0 +1,10 @@
+prefix=/home/eren/Masaüstü/stt-app/third_party/llama
+exec_prefix=/home/eren/Masaüstü/stt-app/third_party/llama
+libdir=/home/eren/Masaüstü/stt-app/third_party/llama/lib
+includedir=/home/eren/Masaüstü/stt-app/third_party/llama/include
+
+Name: llama
+Description: Port of Facebook's LLaMA model in C/C++
+Version: 1.0.0-dev
+Libs: -L${libdir} -lggml -lggml-base -lllama
+Cflags: -I${includedir}
