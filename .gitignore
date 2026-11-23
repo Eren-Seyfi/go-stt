@@ -1,0 +1,19 @@
+.task
+bin
+frontend/dist
+frontend/node_modules
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+# Mobile generated (per-machine; overlays hold absolute paths)
+build/ios/xcode/overlay.json
+build/ios/xcode/gen/
+build/android/overlay.json
+build/android/gen/
+# Vosk library and speech model (downloaded, large)
+third_party/
+# App data — everything the app stores lives in the project folder
+/database.sqlite
+/database.sqlite-*
+/models/
+/attachments/
+/.webkit/

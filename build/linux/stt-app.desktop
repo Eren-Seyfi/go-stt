@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=stt-app
+Exec=stt-app
+Icon=stt-app
+Categories=Development;
+Terminal=false
+Keywords=wails
+Version=1.0
+StartupNotify=false
