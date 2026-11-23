@@ -1,0 +1,18 @@
+STT App — Windows taşınabilir sürüm
+===================================
+
+Kurulum gerekmez: klasörü istediğiniz yere kopyalayıp stt-app.exe'yi çalıştırın.
+
+- Ayarlar, geçmiş ve modeller bu klasörde tutulur (database.sqlite, models\).
+  Klasörü yazma izni olan bir yere koyun (ör. Belgeler, Masaüstü);
+  "C:\Program Files" içine koymayın.
+- Arayüz Microsoft Edge WebView2 kullanır. Windows 10/11'de genelde kuruludur;
+  değilse: https://developer.microsoft.com/microsoft-edge/webview2/
+- Konuşma tanıma bu sürümde CPU ile çalışır (AVX2 destekli işlemci gerekir).
+- llama-server.exe yerel GGUF modellerini çalıştırmak içindir.
+
+BİLİNEN KISITLAMALAR
+- Mikrofon kaydı Windows'ta henüz desteklenmiyor (Linux'a özgü pactl/parecord
+  kullanılıyor). Yapay zekâ sohbeti ve dosya ekleme çalışır.
+- "Klasörü aç" düğmeleri çalışmaz.
+- Uygulama çökerse llama-server.exe açık kalabilir; Görev Yöneticisi'nden kapatın.
