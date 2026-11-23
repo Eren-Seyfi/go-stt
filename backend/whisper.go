@@ -2,7 +2,12 @@ package backend
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../third_party/whisper/include
-#cgo LDFLAGS: -L${SRCDIR}/../third_party/whisper/lib -lwhisper -lggml -lggml-base -Wl,-rpath,${SRCDIR}/../third_party/whisper/lib
+#cgo LDFLAGS: -L${SRCDIR}/../third_party/whisper/lib -lwhisper -lggml -lggml-base
+#cgo linux LDFLAGS: -Wl,-rpath,${SRCDIR}/../third_party/whisper/lib
+#cgo darwin LDFLAGS: -Wl,-rpath,${SRCDIR}/../third_party/whisper/lib
+// Windows has no rpath: whisper.dll, ggml.dll and ggml-base.dll (from
+// third_party/whisper/bin after a CMake install) must sit next to the .exe
+// or be on PATH. MinGW links against the import libraries (.dll.a) in lib/.
 #include <stdlib.h>
 #include "whisper.h"
 #include "ggml-backend.h"

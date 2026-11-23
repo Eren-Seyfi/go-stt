@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -18,7 +17,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -89,55 +87,32 @@ func NewLlamaService(store *Store) *LlamaService {
 	return s
 }
 
-// killOrphanServers stops llama-servers an earlier run of the app left
-// behind (e.g. after a crash): our binary, started with our "--alias yerel",
-// and no longer owned by a running stt-app.
-func killOrphanServers(bin string) {
-	if bin == "" {
-		return
-	}
-	want, err := filepath.EvalSymlinks(bin)
-	if err != nil {
-		return
-	}
-	self, _ := os.Executable()
-	selfName := filepath.Base(self)
-	procs, _ := os.ReadDir("/proc")
-	for _, p := range procs {
-		pid, err := strconv.Atoi(p.Name())
-		if err != nil || pid == os.Getpid() {
-			continue
-		}
-		exe, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
-		if err != nil || exe != want {
-			continue
-		}
-		cmdline, _ := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
-		if !strings.Contains(string(cmdline), "--alias\x00yerel\x00") {
-			continue
-		}
-		stat, _ := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-		// stat: "pid (comm) state ppid …" — comm may contain spaces, so split after ')'
-		fields := strings.Fields(string(stat[strings.LastIndexByte(string(stat), ')')+1:]))
-		if len(fields) > 1 {
-			if ppid, _ := strconv.Atoi(fields[1]); ppid > 1 {
-				if parent, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", ppid)); err == nil && filepath.Base(parent) == selfName {
-					continue // belongs to another running copy of the app
-				}
-			}
-		}
-		log.Printf("llama: önceki oturumdan kalan llama-server kapatılıyor (pid %d)", pid)
-		_ = syscall.Kill(pid, syscall.SIGKILL)
-	}
-}
-
 func (s *LlamaService) ServiceShutdown() error {
 	s.Stop()
 	return nil
 }
 
+// llamaServerName is the llama-server file name on this OS.
+func llamaServerName() string {
+	if runtime.GOOS == "windows" {
+		return "llama-server.exe"
+	}
+	return "llama-server"
+}
+
+// isRunnable reports whether st is a file this OS can execute. Windows has no
+// execute bits (Go reports 0666/0444), so there a regular file is enough —
+// the .exe extension is already in the candidate name.
+func isRunnable(st os.FileInfo) bool {
+	if st.IsDir() {
+		return false
+	}
+	return runtime.GOOS == "windows" || st.Mode()&0o111 != 0
+}
+
 // findLlamaServer looks for the llama-server binary.
 func findLlamaServer() string {
+	name := llamaServerName()
 	var cands []string
 	if p := os.Getenv("STT_LLAMA_SERVER"); p != "" {
 		cands = append(cands, p)
@@ -145,17 +120,18 @@ func findLlamaServer() string {
 	if exe, err := os.Executable(); err == nil {
 		dir := filepath.Dir(exe)
 		cands = append(cands,
-			filepath.Join(dir, "llama", "bin", "llama-server"),
-			filepath.Join(dir, "..", "third_party", "llama", "bin", "llama-server"))
+			filepath.Join(dir, name), // Windows release: llama-server.exe next to the app
+			filepath.Join(dir, "llama", "bin", name),
+			filepath.Join(dir, "..", "third_party", "llama", "bin", name))
 	}
 	if _, file, _, ok := runtime.Caller(0); ok { // development builds: next to the sources
-		cands = append(cands, filepath.Join(filepath.Dir(file), "..", "third_party", "llama", "bin", "llama-server"))
+		cands = append(cands, filepath.Join(filepath.Dir(file), "..", "third_party", "llama", "bin", name))
 	}
 	if wd, err := os.Getwd(); err == nil {
-		cands = append(cands, filepath.Join(wd, "third_party", "llama", "bin", "llama-server"))
+		cands = append(cands, filepath.Join(wd, "third_party", "llama", "bin", name))
 	}
 	for _, c := range cands {
-		if st, err := os.Stat(c); err == nil && !st.IsDir() && st.Mode()&0o111 != 0 {
+		if st, err := os.Stat(c); err == nil && isRunnable(st) {
 			if abs, err := filepath.Abs(c); err == nil {
 				return abs
 			}
@@ -204,11 +180,11 @@ func (s *LlamaService) Stop() {
 	if cmd == nil {
 		return
 	}
-	_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+	terminateServer(cmd)
 	select {
 	case <-exited:
 	case <-time.After(5 * time.Second):
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		killServer(cmd)
 		<-exited
 	}
 }
@@ -292,10 +268,7 @@ func (s *LlamaService) start(spec string, cfg LlamaConfig) (chan struct{}, error
 	}
 
 	cmd := hostCommand(bin, args...)
-	// If the app dies, the server must die too. SIGKILL, not SIGTERM: on
-	// SIGTERM llama-server tries a graceful shutdown that can hang, and with
-	// the app gone nothing would kill it afterwards.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
+	setServerProcAttrs(cmd) // per-OS: process group, die-with-parent, no console window
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
 	if err := cmd.Start(); err != nil {
