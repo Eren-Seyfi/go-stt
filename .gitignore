@@ -17,3 +17,5 @@ build/android/gen/
 /models/
 /attachments/
 /.webkit/
+# Original upstream git metadata of vendored sources (kept locally, not tracked)
+third_party/*/.git-orig/
